@@ -1,9 +1,13 @@
 
 <h1 align="center">MCP Web Chat</h1 >
 
-<p align="center">
+
+<div align="center">
+
 [功能介绍](#功能介绍) | [环境构建](#环境构建) | [应用相关说明](#应用相关说明) | [启动脚本](#启动脚本)
-</p>
+
+</div>
+
 
 # 功能介绍
 - 可以调用MCP进行WebChat，解决了MCP Server长期连接可能中断的问题
@@ -66,7 +70,7 @@ pip install numpy==1.26.0 -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 激活虚拟环境
 
-conda activate agent
+conda activate mcp
 
 Linux服务器后台方式自动运行
 
@@ -144,7 +148,7 @@ mcp_chat 专职chat，并通过host获取与调用mcp tool
 目前暂未处理，连接失败重连的情况
 
 
-## 社区交流互动
+# 社区交流互动
 
 欢迎关注公众号，交流、获取更多信息
 
