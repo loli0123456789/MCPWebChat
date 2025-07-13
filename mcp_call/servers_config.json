@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "amap-sse": {
+      "url": "https://mcp.amap.com/sse?key="
+    },
+    "common-sse": {
+      "url": "http://127.0.0.1:9001/sse"
+    },
+    "business-sse": {
+      "url": "http://127.0.0.1:9002/sse"
+    }
+  }
+}

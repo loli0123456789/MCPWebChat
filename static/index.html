@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="static/js/tailwind.min.js"></script>
+    <script src="static/js/marked.min.js"></script>
+    <link href="static/css/font-awesome.min.css" rel="stylesheet">
+    <title>AI对话助手</title>
+
+    <style>
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .animate-pulse {
+            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* 添加表格样式 */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f5f5f5;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        /* 添加更具体的超链接样式 */
+        a,
+        a:link,
+        a:visited,
+        a:hover,
+        a:active {
+            color: #3b82f6 !important;
+            text-decoration: underline !important;
+        }
+    </style>
+    <link rel="icon" href="static/logo.png" type="image/x-icon">
+</head>
+
+<body class="bg-gray-100 font-sans h-screen">
+    <div class="container mx-auto p-4 h-full flex flex-col">
+        <!-- 给这个 div 添加背景样式 -->
+        <div class="flex items-center justify-between mb-4 bg-white rounded-lg shadow p-4">
+            <div class="flex items-center">
+                <h1 class="text-3xl font-bold">MCP Web Chat</h1>
+            </div>
+            <!-- 优化个人信息显示容器 -->
+            <div id="userInfo" class="flex items-center space-x-4 relative">
+                <!-- 可以添加头像 -->
+                <div class="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-gray-500">
+                    <i class="fa fa-user fa-2x"></i>
+                </div>
+                <div class="flex flex-col">
+                    <!-- 显示用户名 -->
+                    <p class="text-xl font-bold text-gray-800">你好 <span id="userName"></span></p>
+                    <!-- 可以添加更多信息 -->
+                    <!-- <p class="text-sm text-gray-600">用户邮箱: <span id="userEmail"></span></p> -->
+                </div>
+                <!-- 下拉注销菜单 -->
+                <div class="ml-4 cursor-pointer relative" id="logoutDropdown">
+                    <!-- 确保使用正确的下拉箭头图标类名 -->
+                    <i class="fa fa-angle-down fa-lg text-gray-600"></i>
+                    <div id="logoutMenu" class="hidden absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg z-10">
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            id="logoutLink">注销</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 聊天记录容器 -->
+        <div id="chatContainer" class="flex-1 bg-white rounded-lg shadow p-4 mb-4 overflow-y-auto">
+            <div class="space-y-4" id="chatMessages">
+                <!-- 示例消息
+                <div class="flex justify-end">
+                    <div class="bg-blue-100 p-3 rounded-lg max-w-3xl">
+                        <div class="text-sm text-gray-500">07:01:07</div>
+                        <div>今天我要去天津</div>
+                    </div>
+                </div>
+                <div class="flex justify-start">
+                    <div class="bg-gray-100 p-3 rounded-lg max-w-3xl">
+                        <div class="text-sm text-gray-500">07:01:08</div>
+                        <div>哟，天津欢迎你啊！记得带上你的好胃口...</div>
+                    </div>
+                </div> -->
+            </div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="bg-white rounded-lg shadow p-4">
+            <div class="flex gap-2">
+                <textarea id="messageInput" placeholder="输入消息..." class="flex-1 border p-2 rounded-lg resize-none"
+                    rows="2"></textarea>
+                <button id="sendButton" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600">
+                    发送
+                </button>
+            </div>
+            <div class="mt-2 text-sm text-gray-500">
+                <!-- 支持流式响应， -->按 Enter 发送，Shift+Enter 换行
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+        let userId; // 声明 userId 变量
+        userId = "U001";
+
+        // 新建会话方法
+        async function createNewConversation(agentId, conversationName, userId) {
+            try {
+                const formData = new FormData();
+                formData.append('agentId', agentId);
+                formData.append('conversationName', conversationName);
+                formData.append('userId', userId);
+
+                const response = await fetch('/conversation/add', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('创建会话失败');
+                }
+
+                const data = await response.json();
+                if (data.errCode === 0) { // 假设成功返回的errCode为0
+                    console.log('创建会话成功:', data.data);
+                    return data.data; // 返回会话ID
+                } else {
+                    throw new Error(data.errMsg || '创建会话失败');
+                }
+            } catch (error) {
+                console.error('创建会话时出错:', error);
+                throw error;
+            }
+        }
+
+        // 点击下拉箭头显示/隐藏注销菜单
+        document.getElementById('logoutDropdown').addEventListener('click', function () {
+            const logoutMenu = document.getElementById('logoutMenu');
+            logoutMenu.classList.toggle('hidden');
+        });
+
+        // 点击页面其他地方隐藏注销菜单
+        document.addEventListener('click', function (e) {
+            const logoutMenu = document.getElementById('logoutMenu');
+            const logoutDropdown = document.getElementById('logoutDropdown');
+            if (!logoutDropdown.contains(e.target)) {
+                logoutMenu.classList.add('hidden');
+            }
+        });
+
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        let currentResponseDiv = null;
+
+        sendButton.textContent = '发送';
+        let abortController = null; // 用于存储 AbortController 实例
+        let currentRequestId = null;
+
+        // sessionId默认是空，在新发送消息的时候调用生成 
+        let sessionId = "";
+
+        // 恢复发送按钮的函数
+        function resetSendButton() {
+            sendButton.disabled = false;
+            sendButton.textContent = '发送';
+            sendButton.classList.remove('bg-red-500', 'hover:bg-red-600');
+            sendButton.classList.add('bg-blue-500', 'hover:bg-blue-600');
+        }
+
+        function handleStreamResponse(response) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let fullResponse = '';
+
+            // 在 readChunk 函数的 done 分支添加时间记录
+            function readChunk() {
+                return reader.read().then(({ done, value }) => {
+                    if (done) {
+                        if (buffer) {
+                            processBuffer();
+                        }
+                        // 消息完成时，不显示闪烁光标，但保持与输出过程中相同的格式
+                        updateDisplay();
+                        // 移除闪烁光标
+                        currentResponseDiv.innerHTML = currentResponseDiv.innerHTML.replace('<span class="animate-pulse">▌</span>', '');
+                        currentResponseDiv.classList.remove('text-gray-400');
+
+                        // 添加 AI 回复完成的时间记录
+                        const aiResponseTime = new Date().toLocaleTimeString();
+                        const timeDiv = document.createElement('div');
+                        timeDiv.className = 'text-sm text-gray-500';
+                        timeDiv.textContent = aiResponseTime;
+                        // 找到包含回复内容的父元素的第一个子元素（即时间显示的 div）
+                        const messageContainer = currentResponseDiv.closest('.bg-gray-100');
+                        if (messageContainer) {
+                            const selectedAgent = "agent-001";
+                            const agentId = "agent-001";
+                            // 替换原有的时间记录
+                            const originalTimeDiv = messageContainer.querySelector('.text-sm.text-gray-500');
+                            if (originalTimeDiv) {
+                                originalTimeDiv.textContent = selectedAgent && agentId.toLowerCase() !== 'common'
+                                    ? `${selectedAgent} · ${aiResponseTime}`
+                                    : aiResponseTime;
+                            } else {
+                                timeDiv.textContent = selectedAgent && agentId.toLowerCase() !== 'common'
+                                    ? `${selectedAgent} · ${aiResponseTime}`
+                                    : aiResponseTime;
+                                messageContainer.prepend(timeDiv);
+                            }
+                        }
+
+                        currentResponseDiv = null;
+
+                        // 恢复发送按钮
+                        resetSendButton();
+                        return;
+                    }
+
+                    // 解码并添加到缓冲区
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // 处理缓冲区中的完整消息
+                    processBuffer();
+
+                    return readChunk();
+                });
+            }
+
+            // 处理缓冲区的函数
+            function processBuffer() {
+                // 按换行符分割消息
+                const lines = buffer.split('\n');
+                // 保留最后一个可能不完整的行
+                buffer = lines.pop() || '';
+
+                let hasNewContent = false;
+
+                // 处理完整的行
+                for (const line of lines) {
+                    if (line.trim().startsWith('data: ')) {
+                        try {
+                            const jsonStr = line.slice(6).trim();
+                            const data = JSON.parse(jsonStr);
+                            if (data && data.content) {
+                                fullResponse += data.content;
+                                hasNewContent = true;
+                            }
+                        } catch (e) {
+                            console.error('JSON 解析错误:', e, line);
+                        }
+                    }
+                }
+
+                // 每次有新内容时都更新显示，确保换行符立即生效
+                if (hasNewContent) {
+                    updateDisplay();
+                }
+            }
+
+            // 更新显示的函数
+            function updateDisplay() {
+                // 分段处理内容，保留表格处理功能
+                let displayContent = '';
+                const parts = fullResponse.split('\n');
+                let isTable = false;
+                let tableContent = '';
+
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    if (part.includes('|')) {
+                        // 收集表格内容
+                        tableContent += part + '\n';
+                        isTable = true;
+                    } else {
+                        // 如果之前有表格内容，先渲染表格
+                        if (isTable) {
+                            displayContent += marked.parse(tableContent);
+                            tableContent = '';
+                            isTable = false;
+                        }
+                        // 添加非表格内容，确保换行符被转换为<br>标签
+                        // 只在不是最后一部分时添加<br>标签
+                        displayContent += part;
+                        if (i < parts.length - 1) {
+                            displayContent += '<br>';
+                        }
+                    }
+                }
+
+                // 处理最后的表格内容（如果有）
+                if (isTable) {
+                    displayContent += marked.parse(tableContent);
+                }
+
+                // 更新显示，添加闪烁光标
+                currentResponseDiv.innerHTML = displayContent + '<span class="animate-pulse">▌</span>';
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+
+            return readChunk();
+        }
+
+        function handleNonStreamResponse(response) {
+            response.json().then(data => {
+                if (data && data.data) {
+                    const aiMessage = "json数据，需要解析后展示…";
+                    addMessage('assistant', aiMessage);
+                    currentResponseDiv = null;
+                } else {
+                    console.error('无效的非流式响应:', data);
+                }
+                resetSendButton();
+            }).catch(error => {
+                console.error('解析非流式响应失败:', error);
+                resetSendButton();
+            });
+        }
+
+        // 消息发送逻辑
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // 从URL获取type参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const chatType = urlParams.get('type') || 'agent';
+            // 从下拉框获取所选的 agent ID
+            const agentId = "agent-001";
+
+            // 检查当前聊天窗口是否有消息
+            const hasMessages = chatMessages.children.length > 0;
+
+            // 如果没有消息，则生成新的sessionId
+            if (!hasMessages) {
+                sessionId = await createNewConversation(agentId, "新会话", userId);
+                console.log("sessionId:", sessionId);
+            }
+
+            // 检查 userId 是否已经获取
+            if (!sessionId) {
+                alert('会话信息尚未获取，请稍后再试');
+                return;
+            }
+
+            // 检查 userId 是否已经获取
+            if (!userId) {
+                alert('用户信息尚未获取，请稍后再试');
+                return;
+            }
+
+            // 初始化 AbortController
+            abortController = new AbortController();
+
+            // 只禁用发送按钮，并改为“终止”
+            sendButton.disabled = false;
+            sendButton.textContent = '终止';
+            sendButton.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+            sendButton.classList.add('bg-red-500', 'hover:bg-red-600');
+
+            // 添加用户消息
+            addMessage('user', message);
+
+            // 清空输入框
+            messageInput.value = '';
+
+            // 创建等待中的回复框
+            currentResponseDiv = addMessage('assistant', '思考中...', true);
+
+            // 发送请求到/chat接口
+            fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                // 修改请求体，添加 agentId 字段
+                body: JSON.stringify({
+                    message,
+                    chatType,
+                    agentId,
+                    sessionId,
+                    userId // 使用动态获取的 userId
+                }),
+                signal: abortController.signal // 将信号传递给 fetch
+            })
+                .then(response => {
+                    // 检查是否是流式响应
+                    const contentType = response.headers.get('content-type');
+
+                    currentRequestId = response.headers.get('X-Request-ID');
+                    // 返回消息id
+                    x_messageId = response.headers.get('X-Message-ID');
+                    console.log("X-Message-ID:", x_messageId);
+
+                    if (contentType && contentType.includes('text/event-stream')) {
+                        // 处理流式响应
+                        handleStreamResponse(response);
+                    } else {
+                        // 处理非流式响应
+                        handleNonStreamResponse(response);
+                    }
+
+                })
+                .catch(error => {
+                    if (error.name === 'AbortError') {
+                        // 发送终止请求
+                        if (currentRequestId) {
+                            fetch('/terminate_chat', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ request_id: currentRequestId })
+                            });
+                        }
+
+                        // 请求被终止时的处理
+                        // 移除闪烁光标
+                        currentResponseDiv.innerHTML = currentResponseDiv.innerHTML.replace('<span class="animate-pulse">▌</span>', '');
+                        const terminationMessage = document.createElement('div');
+                        terminationMessage.innerHTML = `<span class="text-red-500">[请求已被终止]</span>`;
+                        currentResponseDiv.appendChild(terminationMessage);
+                        currentResponseDiv.classList.remove('text-gray-400');
+                        currentResponseDiv = null;
+                    } else {
+                        currentResponseDiv.innerHTML = `<span class="text-red-500">错误: ${error.message}</span>`;
+                        currentResponseDiv.classList.remove('text-gray-400');
+                        currentResponseDiv = null;
+                    }
+
+                    // 恢复发送按钮
+                    resetSendButton();
+                    messageInput.focus();
+                });
+
+        }
+
+        // 添加消息到聊天记录
+        function addMessage(role, content, isPending = false) {
+            const timestamp = new Date().toLocaleTimeString();
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex justify-${role === 'user' ? 'end' : 'start'} mb-4`;
+
+            // 处理换行符，将\n转换为<br>
+            const formattedContent = content.replace(/\n/g, '<br>');
+
+            // 获取当前选中的agent名称和ID
+            const selectedAgent = "agent-001";
+            const agentId = "agent-001";
+
+            messageDiv.innerHTML = `
+                <div class="bg-${role === 'user' ? 'blue' : 'gray'}-100 p-3 rounded-lg max-w-3xl relative">
+                    ${role === 'assistant' ? '<div class="absolute top-2 left-[-28px] w-6 h-6 bg-gray-300 rounded-full"></div>' : ''}
+                    <div class="text-sm text-gray-500">
+                        ${role === 'assistant' && selectedAgent && agentId.toLowerCase() !== 'common' ? `${selectedAgent} · ${timestamp}` : timestamp}
+                    </div>
+                    <div class="mt-1 ${isPending ? 'text-gray-400' : ''}">${formattedContent}</div>
+                </div>
+            `;
+
+            chatMessages.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return messageDiv.querySelector('div > div:last-child');
+        }
+
+        // 事件绑定
+        sendButton.addEventListener('click', (e) => {
+            if (sendButton.textContent === '终止') {
+                // 如果当前是“终止”状态，则中断请求
+                if (abortController) {
+                    abortController.abort(); // 中断请求
+                    abortController = null; // 清空控制器
+                }
+            } else {
+                // 否则发送消息
+                sendMessage();
+            }
+        });
+
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (e.shiftKey) {
+                    // Shift+Enter 换行，让textarea的默认行为处理
+                    return;
+                } else {
+                    // Enter 发送
+                    e.preventDefault();
+                    if (sendButton.textContent === '发送') {
+                        sendMessage();
+                    }
+                }
+            }
+        });
+    </script>
+
+</body>
+
+</html>
